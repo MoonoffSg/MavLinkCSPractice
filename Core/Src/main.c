@@ -204,7 +204,7 @@ void handle_heartbeat(mavlink_message_t* msg)
   */
 int main(void)
 {
-
+	//test
   /* USER CODE BEGIN 1 */
 
   /* USER CODE END 1 */
