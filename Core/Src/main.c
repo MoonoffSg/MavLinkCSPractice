@@ -66,12 +66,11 @@ static void MX_USART2_UART_Init(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 #define RX_BUF_SIZE 256
-uint8_t rx_dma_buf[RX_BUF_SIZE];https://github.com/mono/mono.git
+uint8_t rx_byte[RX_BUF_SIZE];
+uint8_t rx_flag = 0;
+mavlink_status_t status;
 mavlink_message_t msg;
 mavlink_heartbeat_t hb;
-mavlink_status_t status;
-uint16_t old_pos = 0;
-void handle_heartbeat(mavlink_message_t*);
 void uart_send_uint(UART_HandleTypeDef *huart, uint32_t num)
 {
     char buf[10];
@@ -114,7 +113,7 @@ void print_heartbeat(UART_HandleTypeDef *huart, mavlink_heartbeat_t *hb)
     char txt4[] = " SYSSTAT:";
                HAL_UART_Transmit(huart, (uint8_t*)txt4, sizeof(txt4)-1, 10);
 
-               uart_send_uint(huart, hb->mavlink_version);
+               uart_send_uint(huart, hb->system_status);
     char txt5[] = " CUST_MODE:";
          HAL_UART_Transmit(huart, (uint8_t*)txt5, sizeof(txt5)-1, 10);
 
@@ -127,75 +126,25 @@ void print_heartbeat(UART_HandleTypeDef *huart, mavlink_heartbeat_t *hb)
     char nl[] = "\r\n";
     HAL_UART_Transmit(huart, (uint8_t*)nl, sizeof(nl)-1, 10);
 }
+
 void process_byte(uint8_t byte)
 {
-    if (mavlink_parse_char(MAVLINK_COMM_0, byte, &msg, &status))
-    {
-        if (msg.msgid == MAVLINK_MSG_ID_HEARTBEAT)
-        {
-            handle_heartbeat(&msg);
 
-            mavlink_msg_heartbeat_decode(&msg, &hb);
-             print_heartbeat(&huart2, &hb);
-        }
+}
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
+    if (huart->Instance == USART1) {
+    	for(int i= 0; i<RX_BUF_SIZE;i++){
+    		if (mavlink_parse_char(MAVLINK_COMM_0, rx_byte[i], &msg, &status))
+    		    {
+    		        if (msg.msgid == MAVLINK_MSG_ID_HEARTBEAT)
+    		        {
+    		            mavlink_msg_heartbeat_decode(&msg, &hb);
+    		            print_heartbeat(&huart2, &hb);
+    		        }
+    		    }
+    	}
     }
 }
-void process_uart_dma(void)
-{
-    uint16_t pos = RX_BUF_SIZE - __HAL_DMA_GET_COUNTER(huart1.hdmarx);
-
-    if (pos != old_pos)
-    {
-        if (pos > old_pos)
-        {
-            // обычный случай
-            for (uint16_t i = old_pos; i < pos; i++)
-            {
-                process_byte(rx_dma_buf[i]);
-            }
-        }
-        else
-        {
-            // буфер обернулся
-            for (uint16_t i = old_pos; i < RX_BUF_SIZE; i++)
-            {
-                process_byte(rx_dma_buf[i]);
-            }
-            for (uint16_t i = 0; i < pos; i++)
-            {
-                process_byte(rx_dma_buf[i]);
-            }
-        }
-
-        old_pos = pos;
-    }
-}
-void handle_heartbeat(mavlink_message_t* msg)
-{
-    mavlink_heartbeat_t hb;
-
-    mavlink_msg_heartbeat_decode(msg, &hb);
-
-}
-//void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart){
-//    if (huart->Instance == USART1)
-//    {
-//
-//        if (mavlink_parse_char(MAVLINK_COMM_0, rx_buffer, &msg, &status))
-//        {
-//            if (msg.msgid == MAVLINK_MSG_ID_HEARTBEAT)
-//            {
-//                handle_heartbeat(&msg);
-//               // HAL_UART_Transmit(&huart2, (uint8_t*)"X", 1, 10);
-//                HAL_UART_Transmit(&huart2, &system_type, 1, 10);
-//            }
-//        }
-//
-//        HAL_UART_Receive_IT(&huart1, rx_buffer, 1);
-//    }
-//
-//}
-
 /* USER CODE END 0 */
 
 /**
@@ -204,9 +153,8 @@ void handle_heartbeat(mavlink_message_t* msg)
   */
 int main(void)
 {
-	//test
-  /* USER CODE BEGIN 1 */
 
+  /* USER CODE BEGIN 1 */
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -231,8 +179,7 @@ int main(void)
   MX_USART1_UART_Init();
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
-  HAL_UART_Receive_DMA(&huart1, rx_dma_buf, RX_BUF_SIZE);
-  //HAL_UART_Receive_IT(&huart1,&rx_buffer,64);
+HAL_UART_Receive_IT(&huart1, rx_byte, RX_BUF_SIZE);
 
   /* USER CODE END 2 */
 
@@ -240,7 +187,8 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	    process_uart_dma();
+
+
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
