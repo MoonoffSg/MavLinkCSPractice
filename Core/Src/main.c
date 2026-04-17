@@ -142,6 +142,8 @@ void process_byte(uint8_t byte)
         }
     }
 }
+
+
 //DMA Method(work)
 void process_uart_dma(void)
 {
@@ -174,7 +176,8 @@ void process_uart_dma(void)
     }
 }
 
-//(dont work)
+
+//Interrupt method (dont work)
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart){
 	if (huart->Instance == USART1){
 		ringBufPut(&buf, byte);
@@ -232,6 +235,7 @@ int main(void)
   while (1)
   {
 	    //process_uart_dma(); // work
+
 	  while(ringBufRead(&buf, &byte, buf.size)){
 			  process_byte(buf.pData[i]);
 			  i++;
