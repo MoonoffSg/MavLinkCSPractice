@@ -18,12 +18,12 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include<stdio.h>
 #include"mavlink.h"
-//#include"mavlink_types.h"
+#include<stdint.h>
+#include"ring_buffer.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -66,11 +66,14 @@ static void MX_USART2_UART_Init(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 #define RX_BUF_SIZE 256
-uint8_t rx_byte[RX_BUF_SIZE];
-uint8_t rx_flag = 0;
-mavlink_status_t status;
+uint8_t rx_dma_buf[RX_BUF_SIZE];
+uint8_t byte;
 mavlink_message_t msg;
 mavlink_heartbeat_t hb;
+mavlink_status_t status;
+uint16_t old_pos = 0;
+RingBuf_t buf;
+//The best view of data
 void uart_send_uint(UART_HandleTypeDef *huart, uint32_t num)
 {
     char buf[10];
@@ -113,7 +116,7 @@ void print_heartbeat(UART_HandleTypeDef *huart, mavlink_heartbeat_t *hb)
     char txt4[] = " SYSSTAT:";
                HAL_UART_Transmit(huart, (uint8_t*)txt4, sizeof(txt4)-1, 10);
 
-               uart_send_uint(huart, hb->system_status);
+               uart_send_uint(huart, hb->mavlink_version);
     char txt5[] = " CUST_MODE:";
          HAL_UART_Transmit(huart, (uint8_t*)txt5, sizeof(txt5)-1, 10);
 
@@ -127,24 +130,59 @@ void print_heartbeat(UART_HandleTypeDef *huart, mavlink_heartbeat_t *hb)
     HAL_UART_Transmit(huart, (uint8_t*)nl, sizeof(nl)-1, 10);
 }
 
+//MavLink Byte Parse
 void process_byte(uint8_t byte)
 {
-
-}
-void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
-    if (huart->Instance == USART1) {
-    	for(int i= 0; i<RX_BUF_SIZE;i++){
-    		if (mavlink_parse_char(MAVLINK_COMM_0, rx_byte[i], &msg, &status))
-    		    {
-    		        if (msg.msgid == MAVLINK_MSG_ID_HEARTBEAT)
-    		        {
-    		            mavlink_msg_heartbeat_decode(&msg, &hb);
-    		            print_heartbeat(&huart2, &hb);
-    		        }
-    		    }
-    	}
+    if (mavlink_parse_char(MAVLINK_COMM_0, byte, &msg, &status))
+    {
+        if (msg.msgid == MAVLINK_MSG_ID_HEARTBEAT)
+        {
+            mavlink_msg_heartbeat_decode(&msg, &hb);
+            print_heartbeat(&huart2, &hb);
+        }
     }
 }
+//DMA Method(work)
+void process_uart_dma(void)
+{
+    uint16_t pos = RX_BUF_SIZE - __HAL_DMA_GET_COUNTER(huart1.hdmarx);
+
+    if (pos != old_pos)
+    {
+        if (pos > old_pos)
+        {
+            // обычный случай
+            for (uint16_t i = old_pos; i < pos; i++)
+            {
+                process_byte(rx_dma_buf[i]);
+            }
+        }
+        else
+        {
+            // буфер обернулся
+            for (uint16_t i = old_pos; i < RX_BUF_SIZE; i++)
+            {
+                process_byte(rx_dma_buf[i]);
+            }
+            for (uint16_t i = 0; i < pos; i++)
+            {
+                process_byte(rx_dma_buf[i]);
+            }
+        }
+
+        old_pos = pos;
+    }
+}
+
+//(dont work)
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart){
+	if (huart->Instance == USART1){
+		ringBufPut(&buf, byte);
+		//HAL_UART_Receive_IT(&huart1, &byte, 1);
+	}
+	HAL_UART_Receive_IT(&huart1, &byte, 1);
+}
+
 /* USER CODE END 0 */
 
 /**
@@ -153,8 +191,9 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
   */
 int main(void)
 {
-
+	//test
   /* USER CODE BEGIN 1 */
+
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -179,16 +218,26 @@ int main(void)
   MX_USART1_UART_Init();
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
-HAL_UART_Receive_IT(&huart1, rx_byte, RX_BUF_SIZE);
 
+  //HAL_UART_Receive_DMA(&huart1, rx_dma_buf, RX_BUF_SIZE); // work
+
+  //HAL_UART_Receive_DMA(&huart1, &byte, 1);
+  //HAL_UART_Receive_IT(&huart1, &byte, 1);
+  HAL_UART_Receive_IT(&huart1, &byte, 1);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+  int i =0;
   while (1)
   {
+	    //process_uart_dma(); // work
+	  while(ringBufRead(&buf, &byte, buf.size)){
+			  process_byte(buf.pData[i]);
+			  i++;
 
-
+	  }
+	  i = 0;
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
