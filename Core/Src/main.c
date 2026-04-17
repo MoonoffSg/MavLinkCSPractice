@@ -22,8 +22,8 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include<stdio.h>
-#include"/home/alex/STM32Project/MavLib/minimal/mavlink.h"
-#include"/home/alex/STM32Project/MavLib/mavlink_types.h"
+#include"mavlink.h"
+//#include"mavlink_types.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
