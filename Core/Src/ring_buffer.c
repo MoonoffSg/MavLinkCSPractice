@@ -37,7 +37,7 @@ bool ringBufGet(RingBuf_t *pRingBuf, uint8_t *pByte)
 {
     if (pRingBuf == NULL)
         return false;
-        
+
     if (pRingBuf->start != pRingBuf->end)
     {
         *pByte = pRingBuf->pData[pRingBuf->start++];
@@ -75,9 +75,12 @@ uint16_t ringBufSize(RingBuf_t *pRingBuf)
 {
     if (pRingBuf == NULL)
         return 0;
-        
+
     if (pRingBuf->end >= pRingBuf->start)
         return pRingBuf->end - pRingBuf->start;
     else
         return pRingBuf->size + pRingBuf->end - pRingBuf->start;
+}
+bool isringBufEmpty(RingBuf_t *pRingBuf){
+	return (pRingBuf->start == pRingBuf->end);
 }

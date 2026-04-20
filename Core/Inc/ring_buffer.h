@@ -59,6 +59,7 @@ bool ringBufRead(RingBuf_t *pRingBuf, uint8_t *data, uint16_t size);
   * @param  pRingBuf pointer to object structure.
   * @retval size of buf.
   */
+bool isringBufEmpty(RingBuf_t *pRingBuf);
 uint16_t ringBufSize(RingBuf_t *pRingBuf);
 
 #ifdef __cplusplus

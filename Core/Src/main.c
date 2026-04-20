@@ -18,6 +18,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include<stdio.h>
@@ -44,10 +45,6 @@
 /* Private variables ---------------------------------------------------------*/
 UART_HandleTypeDef huart1;
 UART_HandleTypeDef huart2;
-DMA_HandleTypeDef hdma_usart1_rx;
-DMA_HandleTypeDef hdma_usart1_tx;
-DMA_HandleTypeDef hdma_usart2_rx;
-DMA_HandleTypeDef hdma_usart2_tx;
 
 /* USER CODE BEGIN PV */
 
@@ -56,7 +53,6 @@ DMA_HandleTypeDef hdma_usart2_tx;
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
-static void MX_DMA_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_USART2_UART_Init(void);
 /* USER CODE BEGIN PFP */
@@ -66,13 +62,12 @@ static void MX_USART2_UART_Init(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 #define RX_BUF_SIZE 256
-uint8_t rx_dma_buf[RX_BUF_SIZE];
-uint8_t byte;
+uint8_t byte[RX_BUF_SIZE];
 mavlink_message_t msg;
 mavlink_heartbeat_t hb;
 mavlink_status_t status;
-uint16_t old_pos = 0;
 RingBuf_t buf;
+
 //The best view of data
 void uart_send_uint(UART_HandleTypeDef *huart, uint32_t num)
 {
@@ -133,8 +128,10 @@ void print_heartbeat(UART_HandleTypeDef *huart, mavlink_heartbeat_t *hb)
 //MavLink Byte Parse
 void process_byte(uint8_t byte)
 {
+
     if (mavlink_parse_char(MAVLINK_COMM_0, byte, &msg, &status))
     {
+
         if (msg.msgid == MAVLINK_MSG_ID_HEARTBEAT)
         {
             mavlink_msg_heartbeat_decode(&msg, &hb);
@@ -144,46 +141,13 @@ void process_byte(uint8_t byte)
 }
 
 
-//DMA Method(work)
-void process_uart_dma(void)
-{
-    uint16_t pos = RX_BUF_SIZE - __HAL_DMA_GET_COUNTER(huart1.hdmarx);
-
-    if (pos != old_pos)
-    {
-        if (pos > old_pos)
-        {
-            // обычный случай
-            for (uint16_t i = old_pos; i < pos; i++)
-            {
-                process_byte(rx_dma_buf[i]);
-            }
-        }
-        else
-        {
-            // буфер обернулся
-            for (uint16_t i = old_pos; i < RX_BUF_SIZE; i++)
-            {
-                process_byte(rx_dma_buf[i]);
-            }
-            for (uint16_t i = 0; i < pos; i++)
-            {
-                process_byte(rx_dma_buf[i]);
-            }
-        }
-
-        old_pos = pos;
-    }
-}
-
-
-//Interrupt method (dont work)
+//Interrupt method
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart){
 	if (huart->Instance == USART1){
-		ringBufPut(&buf, byte);
-		//HAL_UART_Receive_IT(&huart1, &byte, 1);
+		for(int i =0; i<RX_BUF_SIZE;i++)
+			process_byte(byte[i]);
+		HAL_UART_Receive_IT(&huart1, byte, RX_BUF_SIZE);
 	}
-	HAL_UART_Receive_IT(&huart1, &byte, 1);
 }
 
 /* USER CODE END 0 */
@@ -194,7 +158,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart){
   */
 int main(void)
 {
-	//test
+
   /* USER CODE BEGIN 1 */
 
   /* USER CODE END 1 */
@@ -217,31 +181,18 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
-  MX_DMA_Init();
   MX_USART1_UART_Init();
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
-
-  //HAL_UART_Receive_DMA(&huart1, rx_dma_buf, RX_BUF_SIZE); // work
-
-  //HAL_UART_Receive_DMA(&huart1, &byte, 1);
-  //HAL_UART_Receive_IT(&huart1, &byte, 1);
-  HAL_UART_Receive_IT(&huart1, &byte, 1);
+  HAL_UART_Receive_IT(&huart1, byte, RX_BUF_SIZE);
   /* USER CODE END 2 */
-
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  int i =0;
+
+
   while (1)
   {
-	    //process_uart_dma(); // work
 
-	  while(ringBufRead(&buf, &byte, buf.size)){
-			  process_byte(buf.pData[i]);
-			  i++;
-
-	  }
-	  i = 0;
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -358,25 +309,6 @@ static void MX_USART2_UART_Init(void)
   /* USER CODE BEGIN USART2_Init 2 */
 
   /* USER CODE END USART2_Init 2 */
-
-}
-
-/**
-  * Enable DMA controller clock
-  */
-static void MX_DMA_Init(void)
-{
-
-  /* DMA controller clock enable */
-  __HAL_RCC_DMA1_CLK_ENABLE();
-
-  /* DMA interrupt init */
-  /* DMA1_Channel2_3_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(DMA1_Channel2_3_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(DMA1_Channel2_3_IRQn);
-  /* DMA1_Channel4_5_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(DMA1_Channel4_5_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(DMA1_Channel4_5_IRQn);
 
 }
 
