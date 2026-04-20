@@ -62,7 +62,7 @@ static void MX_USART2_UART_Init(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 #define RX_BUF_SIZE 256
-uint8_t byte[RX_BUF_SIZE];
+uint8_t byte_buf[RX_BUF_SIZE];
 mavlink_message_t msg;
 mavlink_heartbeat_t hb;
 mavlink_status_t status;
@@ -145,8 +145,8 @@ void process_byte(uint8_t byte)
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart){
 	if (huart->Instance == USART1){
 		for(int i =0; i<RX_BUF_SIZE;i++)
-			process_byte(byte[i]);
-		HAL_UART_Receive_IT(&huart1, byte, RX_BUF_SIZE);
+			process_byte(byte_buf[i]);
+		HAL_UART_Receive_IT(&huart1, byte_buf, RX_BUF_SIZE);
 	}
 }
 
@@ -184,7 +184,7 @@ int main(void)
   MX_USART1_UART_Init();
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
-  HAL_UART_Receive_IT(&huart1, byte, RX_BUF_SIZE);
+  HAL_UART_Receive_IT(&huart1, byte_buf, RX_BUF_SIZE);
   /* USER CODE END 2 */
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
