@@ -221,8 +221,13 @@ int main(void)
 	      uint32_t Time = HAL_GetTick();
 	  	  if(Time-lasttime >= 1000){
 	  	  lasttime +=1000 ;
-		  heartbeat.type = MAV_TYPE_GCS;
-		  heartbeat.base_mode = (uint8_t)8;
+
+		  heartbeat.type = MAV_TYPE_ONBOARD_CONTROLLER;
+		  heartbeat.autopilot = MAV_AUTOPILOT_INVALID;
+		  heartbeat.base_mode = 0;
+		  heartbeat.custom_mode = 0;
+		  heartbeat.system_status = MAV_STATE_ACTIVE;
+		  heartbeat.mavlink_version = 3;
 		  mavlink_msg_heartbeat_encode(255, 0, &messageH, &heartbeat);
 		  sendHeartBeat(&messageH, &huart1);
 
@@ -230,6 +235,18 @@ int main(void)
 
 	  	  if(Time-lasttime10 >= 100){
 	  		  lasttime10 += 100;
+	  		Optical.time_usec = HAL_GetTick() * 1000;
+	  		Optical.integration_time_us = 100000;
+	  		Optical.integrated_x = 0.02f;
+	  		Optical.integrated_y = 0.00f;
+	  		Optical.integrated_xgyro = 0.0f;
+	  		Optical.integrated_ygyro = 0.0f;
+	  		Optical.integrated_zgyro = 0.0f;
+
+	  		Optical.temperature = 25;
+
+	  		Optical.quality = 200;
+	  		Optical.distance = 1.5f;
 	  		 mavlink_msg_optical_flow_rad_encode(255,0,&messageO,&Optical);
 	  		 sendOpticalFlow(&messageO,&huart1);
 	  	  }
