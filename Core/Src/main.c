@@ -25,6 +25,8 @@
 #include"mavlink.h"
 #include<stdint.h>
 #include"ring_buffer.h"
+#include"common.h"
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -67,6 +69,8 @@ mavlink_message_t msg;
 mavlink_heartbeat_t hb;
 mavlink_status_t status;
 RingBuf_t buf;
+
+
 
 //The best view of data
 void uart_send_uint(UART_HandleTypeDef *huart, uint32_t num)
@@ -150,6 +154,22 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart){
 	}
 }
 
+
+
+void sendHeartBeat(mavlink_message_t *msge, UART_HandleTypeDef *huart){
+	uint8_t buff[MAVLINK_MAX_PACKET_LEN];
+	int len = mavlink_msg_to_send_buffer(buff, msge);
+	if(!len) return;
+	HAL_UART_Transmit(huart, buff, len,100);
+}
+
+void sendOpticalFlow(mavlink_message_t *msge, UART_HandleTypeDef *huart){
+	uint8_t buff[MAVLINK_MAX_PACKET_LEN];
+	int len = mavlink_msg_to_send_buffer(buff, msge);
+	if(!len) return;
+	HAL_UART_Transmit(huart, buff, len,100);
+}
+
 /* USER CODE END 0 */
 
 /**
@@ -184,14 +204,35 @@ int main(void)
   MX_USART1_UART_Init();
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
-  HAL_UART_Receive_IT(&huart1, byte_buf, RX_BUF_SIZE);
+ // HAL_UART_Receive_IT(&huart1, byte_buf, RX_BUF_SIZE);
   /* USER CODE END 2 */
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+  mavlink_message_t messageH;
+  mavlink_heartbeat_t heartbeat;
 
+  mavlink_message_t messageO;
+  mavlink_optical_flow_rad_t Optical;
 
+  uint32_t lasttime = 0;
+  uint32_t lasttime10 = 0;
   while (1)
   {
+	      uint32_t Time = HAL_GetTick();
+	  	  if(Time-lasttime >= 1000){
+	  	  lasttime +=1000 ;
+		  heartbeat.type = MAV_TYPE_GCS;
+		  heartbeat.base_mode = (uint8_t)8;
+		  mavlink_msg_heartbeat_encode(255, 0, &messageH, &heartbeat);
+		  sendHeartBeat(&messageH, &huart1);
+
+	  	  }
+
+	  	  if(Time-lasttime10 >= 100){
+	  		  lasttime10 += 100;
+	  		 mavlink_msg_optical_flow_rad_encode(255,0,&messageO,&Optical);
+	  		 sendOpticalFlow(&messageO,&huart1);
+	  	  }
 
     /* USER CODE END WHILE */
 
