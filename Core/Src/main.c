@@ -25,6 +25,7 @@
 #include"mavlink.h"
 #include<stdint.h>
 #include"ring_buffer.h"
+#include"optical_flow.h"
 #include"common.h"
 
 /* USER CODE END Includes */
@@ -68,10 +69,11 @@ static void MX_TIM1_Init(void);
 /* USER CODE BEGIN 0 */
 #define RX_BUF_SIZE 256
 uint8_t byte_buf[RX_BUF_SIZE];
+
 mavlink_message_t msg;
 mavlink_heartbeat_t hb;
 mavlink_status_t status;
-RingBuf_t buf;
+OpticalFlowData flow;
 
 uint32_t IC_Val1 = 0;
 uint32_t IC_Val2 = 0;
@@ -149,9 +151,12 @@ void process_byte(uint8_t byte)
         if (msg.msgid == MAVLINK_MSG_ID_HEARTBEAT)
         {
             mavlink_msg_heartbeat_decode(&msg, &hb);
-            print_heartbeat(&huart2, &hb);
+            //print_heartbeat(&huart2, &hb);
+
         }
+
     }
+
 }
 
 
@@ -161,6 +166,9 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart){
 		for(int i =0; i<RX_BUF_SIZE;i++)
 			process_byte(byte_buf[i]);
 		HAL_UART_Receive_IT(&huart1, byte_buf, RX_BUF_SIZE);
+	}
+	if (huart->Instance == USART2){
+		OF_UartRXCpltCallback();
 	}
 }
 
@@ -248,8 +256,9 @@ int main(void)
   MX_USART2_UART_Init();
   MX_TIM1_Init();
   /* USER CODE BEGIN 2 */
-  HAL_UART_Receive_IT(&huart1, byte_buf, RX_BUF_SIZE);
+  //HAL_UART_Receive_IT(&huart1, byte_buf, RX_BUF_SIZE);
   HAL_TIM_IC_Start_IT(&htim1, TIM_CHANNEL_4);
+  OF_Init(&huart2);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -292,18 +301,30 @@ int main(void)
 
 	  	  if(Time-lasttime10 >= 100){
 	  		  lasttime10 += 100;
-	  		Optical.time_usec = HAL_GetTick() * 1000;
-	  		Optical.integration_time_us = 100000;
-	  		Optical.integrated_x = 0.02f;
-	  		Optical.integrated_y = 0.00f;
-	  		Optical.integrated_xgyro = 0.0f;
-	  		Optical.integrated_ygyro = 0.0f;
-	  		Optical.integrated_zgyro = 0.0f;
+//	  		Optical.time_usec = HAL_GetTick() * 1000;
+//	  		Optical.integration_time_us = 100000;
+//	  		Optical.integrated_x = 0.02f;
+//	  		Optical.integrated_y = 0.00f;
+//	  		Optical.integrated_xgyro = 0.0f;
+//	  		Optical.integrated_ygyro = 0.0f;
+//	  		Optical.integrated_zgyro = 0.0f;
 
-	  		Optical.temperature = 25;
-
-	  		Optical.quality = 200;
+//
+//	  		Optical.temperature = 25;
+//
+//	  		Optical.quality = 200;
+	  		if(OF_GetData(&flow)){
+	  			Optical.integrated_x = flow.px;
+	  			Optical.integrated_y = flow.py;
+	  			Optical.quality = flow.quality;
+	  		}else {
+//	  		    Optical.integrated_x = -1;
+//	  		    Optical.integrated_y = -1;
+//	  		    Optical.quality = -1;
+	  		}
 	  		Optical.distance = Distance;
+
+
 	  		 mavlink_msg_optical_flow_rad_encode(255,0,&messageO,&Optical);
 	  		 sendOpticalFlow(&messageO,&huart1);
 	  	  }
